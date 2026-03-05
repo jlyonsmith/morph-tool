@@ -58,16 +58,6 @@ pub enum GenoError {
         /// [Location] of the parse error
         location: Location,
     },
-    /// Number parsing error
-    #[error("bad number format '{content}' ({file}:{location})")]
-    NumberFormat {
-        /// The content that caused the number parsing error
-        content: String,
-        /// File path of the schema
-        file: String,
-        /// [Location] of the parse error
-        location: Location,
-    },
     /// Number out of range error
     #[error("value out of range '{content}' ({file}:{location})")]
     NumberRange {
@@ -87,9 +77,12 @@ pub enum GenoError {
     /// Duplicate field error
     #[error("duplicate field '{1}' in struct '{0}'")]
     DuplicateField(String, String),
-    /// Duplicate enum variant error
-    #[error("duplicate variant '{1}' in enum '{0}'")]
+    /// Duplicate enum variant name
+    #[error("duplicate variant name '{1}' in enum '{0}'")]
     DuplicateVariant(String, String),
+    /// Duplicate enum value
+    #[error("duplicate variant value '{1}' in enum '{0}'")]
+    DuplicateVariantValue(String, String),
     /// Enumeration has no variants
     #[error("enum '{0}' has no variants")]
     EmptyEnum(String),
@@ -99,24 +92,6 @@ pub enum GenoError {
 }
 
 impl GenoError {
-    /// Create a new parse error
-    pub fn new_parse_error(pair: &Pair<'_, Rule>, file_path: &Path) -> Self {
-        Self::Parse {
-            content: pair.as_str().to_string(),
-            file: file_path.to_string_lossy().into_owned(),
-            location: Location::from(&pair.as_span()),
-        }
-    }
-
-    /// Create a new number format error
-    pub fn new_number_format_error(pair: &Pair<'_, Rule>, file_path: &Path) -> Self {
-        Self::NumberFormat {
-            content: pair.as_str().to_string(),
-            file: file_path.to_string_lossy().into_owned(),
-            location: Location::from(&pair.as_span()),
-        }
-    }
-
     /// Create a new number range error
     pub fn new_number_range_error(pair: &Pair<'_, Rule>, file_path: &Path) -> Self {
         Self::NumberRange {

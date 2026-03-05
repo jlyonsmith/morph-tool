@@ -223,6 +223,7 @@ dependencies = [
  "anyhow",
  "clap",
  "duct",
+ "num-traits",
  "pest",
  "pest_derive",
  "rmp-serde",

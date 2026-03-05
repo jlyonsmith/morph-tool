@@ -177,3 +177,17 @@ fn no_format_specified() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("No output format specified"));
 }
+
+#[test]
+fn show_help() {
+    let output = cmd!["cargo", "run", "--bin", "geno", "--", "--help"]
+        .stdout_capture()
+        .stderr_capture()
+        .unchecked()
+        .run()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Arguments"));
+}

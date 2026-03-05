@@ -5,7 +5,7 @@ meta {
 // Everything that Geno can do
 
 // Fruits
-enum enum1: i16 {
+enum Enum1: i16 {
   none = -1,
   apple = 1,
 	orange = 2,
@@ -14,7 +14,7 @@ enum enum1: i16 {
 }
 
 // Everything
-struct type1 {
+struct Type1 {
 	alpha: i8,
 	alpha_beta: u8,
 	alphaBeta: i16,
@@ -39,14 +39,15 @@ struct type1 {
 	s2: string?,
 	b1: bool,
 	b2: bool?,
-	e1: enum1,
-	e2: enum1?,
+	e1: Enum1,
+	e2: Enum1?,
 	r1: [ string ],
 	r2: [ string ]?,
-	r2a: [ string; 10], // Fixed length
-	r3: [ bool ],
+	r3: [ string; 10], // Fixed length
+	r4: [ bool ],
 	m1: { i32 : f64 },
 	m2: { string : string },
 	m3: { string : bool },
-	t1: type1, // Nested type
-};
+	t1: Type1, // Nested type
+	t2: Type1?, // Nullable nested type
+}

@@ -73,12 +73,12 @@ fn generate_enum(
     let mut first = true;
 
     for (variant_name, value) in variants {
+        let rust_variant = to_pascal_case(variant_name);
+
         if first {
             writeln!(out, "    #[default]").unwrap();
             first = false;
         }
-
-        let rust_variant = to_pascal_case(variant_name);
         if rust_variant != *variant_name {
             writeln!(out, "    #[serde(rename = \"{variant_name}\")]").unwrap();
         }

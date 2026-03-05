@@ -24,6 +24,8 @@ mod parser {
 
 use parser::{GenoParser, Rule};
 
+use crate::ast::IntegerType;
+
 /// A Geno AST builder
 pub struct GenoAstBuilder {
     file_path: PathBuf,
@@ -62,7 +64,7 @@ impl GenoAstBuilder {
                 Rule::enum_decl => self.build_enum_decl(pair),
                 Rule::struct_decl => self.build_struct_decl(pair),
                 _ => {
-                    return Err(GenoError::new_parse_error(&pair, &self.file_path));
+                    unreachable!(); // Pest problem?
                 }
             }?;
 
@@ -94,11 +96,11 @@ impl GenoAstBuilder {
             let value_pair = inner_pairs.next().unwrap();
             let value = match value_pair.as_rule() {
                 Rule::string_literal => ast::MetadataValue::String(value_pair.as_str().to_string()),
-                Rule::integer_literal => {
-                    ast::MetadataValue::Integer(self.build_integer_literal(value_pair)?)
-                }
+                Rule::integer_literal => ast::MetadataValue::Integer(
+                    self.build_integer_literal(IntegerType::I64, value_pair)?,
+                ),
                 _ => {
-                    return Err(GenoError::new_parse_error(&value_pair, &self.file_path));
+                    unreachable!(); // Pest problem?
                 }
             };
 
@@ -120,30 +122,88 @@ impl GenoAstBuilder {
             "u32" => Ok(ast::IntegerType::U32),
             "i64" => Ok(ast::IntegerType::I64),
             "u64" => Ok(ast::IntegerType::U64),
-            _ => Err(GenoError::new_parse_error(&pair, &self.file_path)),
+            _ => unreachable!(),
         }
     }
 
-    fn build_integer_literal(&self, pair: Pair<'_, Rule>) -> Result<ast::IntegerValue, GenoError> {
+    fn build_integer_literal(
+        &self,
+        base_type: IntegerType,
+        pair: Pair<'_, Rule>,
+    ) -> Result<ast::IntegerValue, GenoError> {
         let s = pair.as_str();
-
-        if s.starts_with("0x") {
-            // Hexadecimal
-            let value = u64::from_str_radix(&s[2..], 16)
-                .map_err(|_| GenoError::new_number_format_error(&pair, &self.file_path))?;
-            Ok(ast::IntegerValue::U64(value))
-        } else if s.starts_with("0b") {
-            // Binary
-            let value = u64::from_str_radix(&s[2..], 2)
-                .map_err(|_| GenoError::new_number_format_error(&pair, &self.file_path))?;
-            Ok(ast::IntegerValue::U64(value))
+        let radix = if s.starts_with("0b") {
+            2
+        } else if s.starts_with("0x") {
+            16
         } else {
-            // Decimal
-            let value = s
-                .parse::<i64>()
-                .map_err(|_| GenoError::new_number_format_error(&pair, &self.file_path))?;
-            Ok(ast::IntegerValue::I64(value))
+            10
+        };
+        let is_signed = matches!(
+            base_type,
+            IntegerType::I8 | IntegerType::I16 | IntegerType::I32 | IntegerType::I64
+        );
+
+        if is_signed && (radix == 16 || radix == 2) {
+            return Err(GenoError::new_number_range_error(&pair, &self.file_path));
         }
+
+        let digits = if radix == 2 || radix == 16 {
+            &s[2..]
+        } else {
+            s
+        };
+
+        match base_type {
+            IntegerType::U8 => {
+                return Ok(ast::IntegerValue::U8(
+                    u8::from_str_radix(digits, radix)
+                        .map_err(|_| GenoError::new_number_range_error(&pair, &self.file_path))?,
+                ));
+            }
+            IntegerType::U16 => {
+                return Ok(ast::IntegerValue::U16(
+                    u16::from_str_radix(digits, radix)
+                        .map_err(|_| GenoError::new_number_range_error(&pair, &self.file_path))?,
+                ));
+            }
+            IntegerType::U32 => {
+                return Ok(ast::IntegerValue::U32(
+                    u32::from_str_radix(digits, radix)
+                        .map_err(|_| GenoError::new_number_range_error(&pair, &self.file_path))?,
+                ));
+            }
+            IntegerType::U64 => {
+                return Ok(ast::IntegerValue::U64(
+                    u64::from_str_radix(digits, radix)
+                        .map_err(|_| GenoError::new_number_range_error(&pair, &self.file_path))?,
+                ));
+            }
+            IntegerType::I8 => {
+                return Ok(ast::IntegerValue::I8(
+                    i8::from_str_radix(digits, radix)
+                        .map_err(|_| GenoError::new_number_range_error(&pair, &self.file_path))?,
+                ));
+            }
+            IntegerType::I16 => {
+                return Ok(ast::IntegerValue::I16(
+                    i16::from_str_radix(digits, radix)
+                        .map_err(|_| GenoError::new_number_range_error(&pair, &self.file_path))?,
+                ));
+            }
+            IntegerType::I32 => {
+                return Ok(ast::IntegerValue::I32(
+                    i32::from_str_radix(digits, radix)
+                        .map_err(|_| GenoError::new_number_range_error(&pair, &self.file_path))?,
+                ));
+            }
+            IntegerType::I64 => {
+                return Ok(ast::IntegerValue::I64(
+                    i64::from_str_radix(digits, radix)
+                        .map_err(|_| GenoError::new_number_range_error(&pair, &self.file_path))?,
+                ));
+            }
+        };
     }
 
     fn build_enum_decl<'a>(
@@ -170,7 +230,8 @@ impl GenoAstBuilder {
         for enum_variant_pair in next_pair.into_inner() {
             let mut variant_inner = enum_variant_pair.into_inner();
             let variant_ident = variant_inner.next().unwrap().as_str().to_string();
-            let variant_value = self.build_integer_literal(variant_inner.next().unwrap())?;
+            let variant_value =
+                self.build_integer_literal(base_type.clone(), variant_inner.next().unwrap())?;
 
             variants.push((variant_ident, variant_value));
         }
@@ -258,7 +319,7 @@ impl GenoAstBuilder {
                 inner_pair.as_str().to_string(),
                 nullable,
             )),
-            _ => Err(GenoError::new_parse_error(&inner_pair, &self.file_path)),
+            _ => unreachable!(),
         }
     }
 
@@ -275,12 +336,12 @@ impl GenoAstBuilder {
                 match s {
                     "f32" => Ok(ast::BuiltinType::Float(ast::FloatType::F32)),
                     "f64" => Ok(ast::BuiltinType::Float(ast::FloatType::F64)),
-                    _ => Err(GenoError::new_parse_error(&inner_pair, &self.file_path)),
+                    _ => unreachable!(),
                 }
             }
             Rule::string_type => Ok(ast::BuiltinType::String),
             Rule::bool_type => Ok(ast::BuiltinType::Bool),
-            _ => Err(GenoError::new_parse_error(&inner_pair, &self.file_path)),
+            _ => unreachable!(),
         }
     }
 }
@@ -290,6 +351,14 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::NamedTempFile;
+
+    fn gen_ast(input: &str) -> Result<ast::Schema, GenoError> {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path().to_path_buf();
+        fs::write(&path, input).unwrap();
+
+        GenoAstBuilder::new(path).build()
+    }
 
     #[test]
     fn happy_path() {
@@ -338,12 +407,40 @@ struct type1 {
     m2: { string : string },
     m3: { string : bool },
     t1: type1,
-};"#;
-        let file = NamedTempFile::new().unwrap();
-        let path = file.path().to_path_buf();
-        fs::write(&path, input).unwrap();
-        let ast = GenoAstBuilder::new(path).build().unwrap();
+}"#;
+        gen_ast(&input).unwrap();
+    }
 
-        println!("{:?}", ast);
+    #[test]
+    fn bad_parse() {
+        let input = "meta { ";
+        let result = gen_ast(&input);
+
+        match result {
+            Err(GenoError::Parse { .. }) => {
+                assert!(true);
+            }
+            _ => {
+                panic!("expected GenoError::Parse");
+            }
+        }
+    }
+
+    #[test]
+    fn number_range() {
+        let input = r#"
+meta { format = 1 }
+enum A:i16 { v = 0xffffffff, }
+"#;
+        let result = gen_ast(&input);
+
+        match result {
+            Err(GenoError::NumberRange { .. }) => {
+                assert!(true);
+            }
+            _ => {
+                panic!("expected GenoError::NumberRange");
+            }
+        }
     }
 }

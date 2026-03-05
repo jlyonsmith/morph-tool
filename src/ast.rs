@@ -141,22 +141,32 @@ impl Schema {
                         return Err(GenoError::DuplicateType(ident.clone()));
                     }
                     let mut variant_names = HashSet::new();
+                    let mut variant_values = HashSet::new();
 
                     // Don't allow enum with no variants
                     if variants.is_empty() {
                         return Err(GenoError::EmptyEnum(ident.clone()));
                     }
 
-                    for (variant_name, _) in variants {
+                    for (variant_name, variant_value) in variants {
                         if !variant_names.insert(variant_name.as_str()) {
                             return Err(GenoError::DuplicateVariant(
                                 ident.clone(),
                                 variant_name.clone(),
                             ));
                         }
+
+                        let value_str = Self::integer_value_str(variant_value);
+
+                        if !variant_values.insert(value_str.clone()) {
+                            return Err(GenoError::DuplicateVariantValue(
+                                variant_name.clone(),
+                                value_str.clone(),
+                            ));
+                        }
                     }
 
-                    // TODO: Check all variants have unique values
+                    // TODO: Check all variants have unique values?
                 }
                 Declaration::Struct { ident, fields } => {
                     if !type_names.insert(ident.as_str()) {
@@ -186,6 +196,19 @@ impl Schema {
         }
 
         Ok(())
+    }
+
+    fn integer_value_str(v: &IntegerValue) -> String {
+        match v {
+            IntegerValue::I8(n) => n.to_string(),
+            IntegerValue::I16(n) => n.to_string(),
+            IntegerValue::I32(n) => n.to_string(),
+            IntegerValue::I64(n) => n.to_string(),
+            IntegerValue::U8(n) => n.to_string(),
+            IntegerValue::U16(n) => n.to_string(),
+            IntegerValue::U32(n) => n.to_string(),
+            IntegerValue::U64(n) => n.to_string(),
+        }
     }
 
     fn check_undefined_types(
